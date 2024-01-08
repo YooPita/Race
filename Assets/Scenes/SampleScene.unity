@@ -826,8 +826,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb9934e0c8360064e8585a830c6a6737, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _roadMeshPrefab: {fileID: 8836923703341106413, guid: 1d9cd4204c2ae2142b584f0bc1a04123,
-    type: 3}
+  _prefab: {fileID: 3372998195966928386, guid: 1d9cd4204c2ae2142b584f0bc1a04123, type: 3}
 --- !u!4 &1327830327
 Transform:
   m_ObjectHideFlags: 0

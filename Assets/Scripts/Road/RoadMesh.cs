@@ -1,12 +1,11 @@
-﻿using Retrover.Path;
-using System;
+﻿using Retrover.ObjectPool;
+using Retrover.Path;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
-public class RoadMesh : MonoBehaviour
+public class RoadMesh : MonoBehaviour, IPoolable
 {
     private Mesh _mesh;
     private float _roadWidth = 1.0f;
@@ -20,14 +19,14 @@ public class RoadMesh : MonoBehaviour
         _renderer = GetComponent<MeshRenderer>();
     }
 
-    public void Activate(List<PathTransform> pathTransforms, float width)
+    public void Initialize(List<PathTransform> pathTransforms, float width)
     {
         _roadWidth = width;
         _pathTransforms.AddRange(pathTransforms);
         GenerateMesh();
     }
 
-    public void Deactivate()
+    public void ReturnToPool()
     {
         _mesh?.Clear();
         _pathTransforms.Clear();

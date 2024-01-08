@@ -74,7 +74,7 @@ public class Road
         _path.Bake();
 
         ISegment segment = _path.SegmentAtIndex(_path.SegmentsCount - 1);
-        _roadMeshesList.Add(_roadMeshes.GetRoadMesh(segment.TransformsCopy(), _roadWidth));
+        _roadMeshesList.Add(_roadMeshes.RoadMesh(segment.TransformsCopy(), _roadWidth));
 
         BakeDebugPoints();
     }
@@ -104,7 +104,7 @@ public class Road
 
     private void RemoveFirstSegment()
     {
-        _roadMeshes.ReturnRoadMesh(_roadMeshesList[0]);
+        _roadMeshes.Push(_roadMeshesList[0]);
         _roadMeshesList.RemoveAt(0);
         StartLength += _path.SegmentAtIndex(0).Length;
         _path.RemoveNodeAtIndex(0);
