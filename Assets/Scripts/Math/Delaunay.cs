@@ -1,13 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace Retrover.Math
 {
     public class Delaunay
     {
-        public TriangulationData TriangulationData { get; private set; }
+        public List<Triangle2> Triangles { get; private set; } = new();
 
         private readonly PointArea _pointArea;
+        private TriangulationData _triangulationData;
 
         public Delaunay(PointArea pointArea)
         {
@@ -23,7 +26,15 @@ namespace Retrover.Math
 
             Triangulation triangulation = new(_pointArea.Normalize().ToHashSet());
             triangulation.Calculate();
-            TriangulationData = triangulation.Data;
+            _triangulationData = triangulation.Data;
+            Triangles.Clear();
+
+            foreach(HalfEdgeFace2 face in _triangulationData.Faces)
+            {
+                IEnumerable<HalfEdgeVertex2> verticles = face.GetVertices();
+                Vector2[] points = _pointArea.Denormalize(verticles.Select(x => x.Position)).ToArray();
+                Triangles.Add(new(points[0], points[1], points[2]));
+            }
         }
 
         private bool CanCalculate()
