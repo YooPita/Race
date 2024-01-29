@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -6,425 +7,272 @@ namespace Retrover.Math
 {
     public class Triangulation
     {
-        public HashSet<HalfEdgeVertex2> Vertices { get; private set; } = new();
+        public TriangulationData Data { get; private set; }
 
-        public HashSet<HalfEdgeFace2> Faces { get; private set; } = new();
-        public HashSet<HalfEdge2> Edges { get; private set; } = new();
-
-        private const float Epsilon = 0.00001f;
-
-        private readonly Triangle2 SuperTriangle = new(new Vector2(-100f, -100f), new Vector2(100f, -100f), new Vector2(0f, 100f));
-
-        private readonly HashSet<Vector2> _points;
+        private TriangulationCalculator _calculator;
 
         public Triangulation(HashSet<Vector2> points)
         {
-            _points = points;
+            Data = new TriangulationData(points);
+            _calculator = new TriangulationCalculator(Data);
         }
 
         public void Calculate()
         {
-            //Step 2. Sort the points into bins to make it faster to find which triangle a point is in
-            //TODO
+            _calculator.Calculate();
+        }
+    }
 
-            //Step 3. Establish the supertriangle
-            AddTriangle(new HashSet<Triangle2>() { SuperTriangle });
+    public class TriangulationCalculator
+    {
+        private readonly TriangulationData _data;
 
-            //Step 5-7
-            foreach (Vector2 point in _points)
-                InsertNewPointInTriangulation(point);
+        public TriangulationCalculator(TriangulationData data)
+        {
+            _data = data ?? throw new ArgumentNullException(nameof(data));
+        }
 
-            //Step 8. Delete the vertices belonging to the supertriangle
+        public void Calculate()
+        {
+            InitializeTriangulation();
+            TriangulatePoints();
             RemoveSuperTriangle();
         }
 
-        public void AddTriangle(HashSet<Triangle2> triangles)
+        private void InitializeTriangulation()
         {
-            triangles = triangles.Select(x => x.OrientClockwise()).ToHashSet();
-
-            Dictionary<(Vector2, Vector2), HalfEdge2> edgeLookup = new();
-
-            foreach (Triangle2 triangle in triangles)
-            {
-                HalfEdgeVertex2 vertex1 = new(triangle.Point1);
-                HalfEdgeVertex2 vertex2 = new(triangle.Point2);
-                HalfEdgeVertex2 vertex3 = new(triangle.Point3);
-
-                //The vertices the edge points to
-                HalfEdge2 halfEdge1 = new(vertex1);
-                HalfEdge2 halfEdge2 = new(vertex2);
-                HalfEdge2 halfEdge3 = new(vertex3);
-
-                halfEdge1.NextEdge = halfEdge2;
-                halfEdge2.NextEdge = halfEdge3;
-                halfEdge3.NextEdge = halfEdge1;
-
-                halfEdge1.PreviousEdge = halfEdge3;
-                halfEdge2.PreviousEdge = halfEdge1;
-                halfEdge3.PreviousEdge = halfEdge2;
-
-                //The vertex needs to know of an edge going from it
-                vertex1.Edge = halfEdge2;
-                vertex2.Edge = halfEdge3;
-                vertex3.Edge = halfEdge1;
-
-                //The face the half-edge is connected to
-                HalfEdgeFace2 face = new(halfEdge1);
-
-                //Each edge needs to know of the face connected to this edge
-                halfEdge1.Face = face;
-                halfEdge2.Face = face;
-                halfEdge3.Face = face;
-
-                //Add everything to the lists
-                Edges.Add(halfEdge1);
-                Edges.Add(halfEdge2);
-                Edges.Add(halfEdge3);
-
-                Faces.Add(face);
-
-                Vertices.Add(vertex1);
-                Vertices.Add(vertex2);
-                Vertices.Add(vertex3);
-            }
-
-            foreach (HalfEdge2 edge in Edges)
-            {
-                HalfEdgeVertex2 goingToVertex = edge.Vertex;
-                HalfEdgeVertex2 goingFromVertex = edge.PreviousEdge.Vertex;
-
-                foreach (HalfEdge2 otherEdge in Edges)
-                {
-                    //Dont compare with itself
-                    if (edge == otherEdge)
-                        continue;
-
-                    //Is this edge going between the vertices in the opposite direction
-                    if (goingFromVertex.Position.Equals(otherEdge.Vertex.Position)
-                        && goingToVertex.Position.Equals(otherEdge.PreviousEdge.Vertex.Position))
-                    {
-                        edge.OppositeEdge = otherEdge;
-
-                        break;
-                    }
-                }
-            }
+            _data.AddTriangle(_data.SuperTriangle);
         }
 
-        public HashSet<HalfEdge2> GetUniqueEdges()
+        private void TriangulatePoints()
         {
-            var uniqueEdges = new HashSet<HalfEdge2>();
-            var edgeDictionary = new Dictionary<(Vector2, Vector2), HalfEdge2>();
-
-            foreach (HalfEdge2 edge in Edges)
-            {
-                var p1 = edge.Vertex.Position;
-                var p2 = edge.PreviousEdge.Vertex.Position;
-
-                var edgeKey = (p1, p2);
-                var reverseEdgeKey = (p2, p1);
-
-                if (!edgeDictionary.ContainsKey(edgeKey) && !edgeDictionary.ContainsKey(reverseEdgeKey))
-                {
-                    edgeDictionary[edgeKey] = edge;
-                    uniqueEdges.Add(edge);
-                }
-            }
-
-            return uniqueEdges;
-        }
-
-        private void RemoveSuperTriangle()
-        {
-            var verticesOfSuperTriangle = new HashSet<Vector2> { SuperTriangle.Point1, SuperTriangle.Point2, SuperTriangle.Point3 };
-            var facesToDelete = new HashSet<HalfEdgeFace2>();
-
-            foreach (var vertex in Vertices)
-            {
-                if (!verticesOfSuperTriangle.Contains(vertex.Position) || facesToDelete.Contains(vertex.Edge.Face))
-                    continue;
-
-                facesToDelete.Add(vertex.Edge.Face);
-            }
-
-            foreach (var face in facesToDelete)
-                DeleteTriangleFace(face, true);
+            foreach (Vector2 point in _data.Points)
+                InsertNewPointInTriangulation(point);
         }
 
         private void InsertNewPointInTriangulation(Vector2 point)
         {
-            //Step 5. Insert the new point in the triangulation
-            //Find the existing triangle the point is in
-            HalfEdgeFace2 face = AddPoint(point);
-
-            //Delete this triangle and form 3 new triangles by connecting p to each of the vertices in the old triangle
+            HalfEdgeFace2 face = FindTriangleContainingPoint(point);
             SplitTriangleFaceAtPoint(face, point);
-
-
-            //Step 6. Initialize stack. Place all triangles which are adjacent to the edges opposite p on a LIFO stack
-            //The report says we should place triangles, but it's easier to place edges with our data structure
-            Stack<HalfEdge2> trianglesToInvestigate = new();
-
-            AddTrianglesOppositePToStack(point, trianglesToInvestigate);
-
-
-            //Step 7. Restore delaunay triangulation
-            //While the stack is not empty
-            int safety = 0;
-
-            while (trianglesToInvestigate.Count > 0)
-            {
-                safety += 1;
-
-                if (safety > 1000000)
-                {
-                    Debug.Log("Stuck in infinite loop when restoring delaunay in incremental sloan algorithm");
-
-                    break;
-                }
-
-                //Step 7.1. Remove a triangle from the stack
-                HalfEdge2 edgeToTest = trianglesToInvestigate.Pop();
-
-                //Step 7.2. Do we need to flip this edge? 
-                //If p is outside or on the circumcircle for this triangle, we have a delaunay triangle and can return to next loop
-                Vector2 a = edgeToTest.Vertex.Position;
-                Vector2 b = edgeToTest.PreviousEdge.Vertex.Position;
-                Vector2 c = edgeToTest.NextEdge.Vertex.Position;
-
-                //abc are here counter-clockwise
-                if (ShouldFlipEdgeStable(a, b, c, point))
-                {
-                    FlipTriangleEdge(edgeToTest);
-
-                    //Step 7.3. Place any triangles which are now opposite p on the stack
-                    AddTrianglesOppositePToStack(point, trianglesToInvestigate);
-                }
-            }
+            RestoreDelaunayTriangulation(point);
         }
 
-        private HalfEdgeFace2 AddPoint(Vector2 point)
+        private HalfEdgeFace2 FindTriangleContainingPoint(Vector2 point)
         {
-            HalfEdgeFace2 currentTriangle = GetRandomTriangle();
+            foreach (var face in _data.Faces)
+                if (IsPointInsideTriangle(face, point))
+                    return face;
 
-            HalfEdgeFace2 intersectingTriangle = null;
-            int safetyCounter = 0;
-
-            while (safetyCounter < 1000000)
-            {
-                safetyCounter++;
-
-                HalfEdge2[] edges = { currentTriangle.Edge, currentTriangle.Edge.NextEdge, currentTriangle.Edge.NextEdge.NextEdge };
-                bool isInside = true;
-
-                foreach (var edge in edges)
-                {
-                    if (!IsPointToTheRightOrOnLine(edge.PreviousEdge.Vertex.Position, edge.Vertex.Position, point))
-                    {
-                        currentTriangle = edge.OppositeEdge.Face;
-                        isInside = false;
-                        break;
-                    }
-                }
-
-                if (isInside)
-                {
-                    intersectingTriangle = currentTriangle;
-                    break;
-                }
-            }
-
-            if (safetyCounter >= 1000000)
-                throw new System.Exception("Stuck in endless loop when walking in triangulation");
-
-
-            return intersectingTriangle;
+            throw new InvalidOperationException("No triangle found containing the point");
         }
 
-        private HalfEdgeFace2 GetRandomTriangle()
+        private bool IsPointInsideTriangle(HalfEdgeFace2 face, Vector2 point)
         {
-            int randomPos = Random.Range(0, Faces.Count);
-            return Faces.ElementAt(randomPos);
-        }
-
-        private static bool IsPointToTheRightOrOnLine(Vector2 a, Vector2 b, Vector2 p)
-        {
-            float relationValue = GetPointInRelationToVectorValue(a, b, p);
-
-            return relationValue <= Epsilon;
-        }
-
-        private static float GetPointInRelationToVectorValue(Vector2 vectorA, Vector2 vectorB, Vector2 point)
-        {
-            float deltaX1 = vectorA.x - point.x;
-            float deltaY1 = vectorA.y - point.y;
-            float deltaX2 = vectorB.x - point.x;
-            float deltaY2 = vectorB.y - point.y;
-
-            return deltaX1 * deltaY2 - deltaX2 * deltaY1;
+            var vertices = face.GetVertices().ToList();
+            return GeometryUtils.IsPointInsideTriangle(vertices[0].Position, vertices[1].Position, vertices[2].Position, point);
         }
 
         private void SplitTriangleFaceAtPoint(HalfEdgeFace2 face, Vector2 splitPosition)
         {
-            var edges = new List<HalfEdge2> { face.Edge, face.Edge.NextEdge, face.Edge.NextEdge.NextEdge };
-            var newEdges = edges.Select(e => CreateNewFace(e, splitPosition)).ToHashSet();
-            FindOppositeEdges(ref newEdges);
-            DeleteTriangleFace(face);//, false);
+            // Разделение треугольника новой точкой
+            IEnumerable<HalfEdge2> newEdges = face.SplitFace(splitPosition);
+            _data.AddEdges(newEdges);
         }
 
-        private HalfEdge2 CreateNewFace(HalfEdge2 edge, Vector2 splitPosition)
+        private void RestoreDelaunayTriangulation(Vector2 point)
         {
-            HalfEdgeVertex2 newVertex = new HalfEdgeVertex2(splitPosition);
+            // Восстановление триангуляции Делоне
+            var edgeStack = new Stack<HalfEdge2>(_data.GetEdgesAroundPoint(point));
 
-            HalfEdge2 newEdge = new(newVertex)
+            while (edgeStack.Count > 0)
             {
-                PreviousEdge = edge,
-                NextEdge = edge.NextEdge
-            };
-
-            edge.NextEdge = newEdge;
-
-            Vertices.Add(newVertex);
-            Edges.Add(newEdge);
-
-            newVertex.Edge = newEdge;
-
-            return newEdge;
-        }
-
-        private static void FindOppositeEdges(ref HashSet<HalfEdge2> newEdges)
-        {
-            foreach (var e in newEdges)
-            {
-                if (e.OppositeEdge != null) continue;
-
-                var eGoingTo = e.Vertex.Position;
-                var eGoingFrom = e.PreviousEdge.Vertex.Position;
-
-                foreach (var eOpposite in newEdges)
+                HalfEdge2 edge = edgeStack.Pop();
+                if (ShouldFlipEdge(edge))
                 {
-                    if (e == eOpposite || eOpposite.OppositeEdge != null) continue;
-
-                    var eGoingTo_Other = eOpposite.Vertex.Position;
-                    var eGoingFrom_Other = eOpposite.PreviousEdge.Vertex.Position;
-
-                    if (eGoingTo.Equals(eGoingFrom_Other) && eGoingFrom.Equals(eGoingTo_Other))
+                    var flippedEdges = edge.Flip();
+                    foreach (var flippedEdge in flippedEdges)
                     {
-                        e.OppositeEdge = eOpposite;
-                        eOpposite.OppositeEdge = e;
+                        if (!_data.IsEdgeOnStack(flippedEdge, edgeStack))
+                        {
+                            edgeStack.Push(flippedEdge);
+                        }
                     }
                 }
             }
         }
 
-        private void DeleteTriangleFace(HalfEdgeFace2 face, bool deleteIsolatedVertices)
+        private bool ShouldFlipEdge(HalfEdge2 edge)
         {
-            HalfEdge2 edge1 = face.Edge;
-            HalfEdge2 edge2 = edge1.NextEdge;
-            HalfEdge2 edge3 = edge2.NextEdge;
-
-            Edges.Remove(edge1);
-            Edges.Remove(edge2);
-            Edges.Remove(edge3);
-
-            Faces.Remove(face);
-
-            if (deleteIsolatedVertices)
-            {
-                DeleteVertexIfIsolated(edge1.Vertex);
-                DeleteVertexIfIsolated(edge2.Vertex);
-                DeleteVertexIfIsolated(edge3.Vertex);
-            }
+            // Проверка, нужно ли переворачивать ребро
+            return GeometryUtils.ShouldFlipEdge(edge);
         }
 
-        private void DeleteVertexIfIsolated(HalfEdgeVertex2 vertex)
+        private void RemoveSuperTriangle()
         {
-            if (vertex.Edge == null || Edges.All(e => e.Vertex != vertex))
-            {
-                Vertices.Remove(vertex);
-            }
+            // Удаление супертреугольника
+            _data.RemoveSuperTriangleVertices();
+        }
+    }
+
+    public class TriangulationData
+    {
+        public HashSet<HalfEdgeVertex2> Vertices { get; private set; } = new HashSet<HalfEdgeVertex2>();
+        public HashSet<HalfEdgeFace2> Faces { get; private set; } = new HashSet<HalfEdgeFace2>();
+        public HashSet<HalfEdge2> Edges { get; private set; } = new HashSet<HalfEdge2>();
+        public HashSet<Vector2> Points { get; private set; }
+        public Triangle2 SuperTriangle { get; private set; }
+
+        public TriangulationData(HashSet<Vector2> points)
+        {
+            Points = points ?? throw new ArgumentNullException(nameof(points));
+            InitializeSuperTriangle();
         }
 
-        private void AddTrianglesOppositePToStack(Vector2 p, Stack<HalfEdge2> trianglesOppositeP)
+        private void InitializeSuperTriangle()
         {
-            HalfEdgeVertex2 rotateAroundThis = Vertices.FirstOrDefault(v => v.Position.Equals(p));
-
-            if (rotateAroundThis == null)
-                return;
-
-            HalfEdgeFace2 startFace = rotateAroundThis.Edge.Face;
-            HalfEdgeFace2 currentFace = null;
-
-            do
-            {
-                HalfEdge2 edgeOppositeRotateVertex = rotateAroundThis.Edge.NextEdge.OppositeEdge;
-
-                if (edgeOppositeRotateVertex != null && !trianglesOppositeP.Contains(edgeOppositeRotateVertex))
-                    trianglesOppositeP.Push(edgeOppositeRotateVertex);
-
-                rotateAroundThis = rotateAroundThis.Edge.OppositeEdge.Vertex;
-                currentFace = rotateAroundThis.Edge.Face;
-            }
-            while (currentFace != startFace);
+            SuperTriangle = new Triangle2(new Vector2(-100f, -100f), new Vector2(100f, -100f), new Vector2(0f, 100f));
+            AddTriangle(SuperTriangle);
         }
 
-        private static bool ShouldFlipEdgeStable(Vector2 v1, Vector2 v2, Vector2 v3, Vector2 vp)
+        public void AddTriangle(Triangle2 triangle)
         {
-            Vector2 diff_13 = v1 - v3;
-            Vector2 diff_23 = v2 - v3;
-            Vector2 diff_1p = v1 - vp;
-            Vector2 diff_2p = v2 - vp;
+            // Создание вершин
+            HalfEdgeVertex2 vertex1 = new(triangle.Point1);
+            HalfEdgeVertex2 vertex2 = new(triangle.Point2);
+            HalfEdgeVertex2 vertex3 = new(triangle.Point3);
 
-            float cos_a = VectorDotProduct(diff_13, diff_23);
-            float cos_b = VectorDotProduct(diff_2p, diff_1p);
+            // Добавление вершин, если их ещё нет в наборе
+            AddVertexIfNotExists(vertex1);
+            AddVertexIfNotExists(vertex2);
+            AddVertexIfNotExists(vertex3);
 
-            if (cos_a >= 0f && cos_b >= 0f)
+            // Создание рёбер
+            HalfEdge2 edge1 = new(vertex1);
+            HalfEdge2 edge2 = new(vertex2);
+            HalfEdge2 edge3 = new(vertex3);
+
+            // Установка связей между рёбрами
+            edge1.NextEdge = edge2;
+            edge1.PreviousEdge = edge3;
+            edge2.NextEdge = edge3;
+            edge2.PreviousEdge = edge1;
+            edge3.NextEdge = edge1;
+            edge3.PreviousEdge = edge2;
+
+            // Создание грани
+            HalfEdgeFace2 face = new(edge1);
+
+            // Установка связи между рёбрами и гранью
+            edge1.Face = face;
+            edge2.Face = face;
+            edge3.Face = face;
+
+            // Добавление рёбер и грани в наборы
+            Edges.Add(edge1);
+            Edges.Add(edge2);
+            Edges.Add(edge3);
+            Faces.Add(face);
+        }
+
+        public void AddEdges(IEnumerable<HalfEdge2> edges)
+        {
+            foreach (var edge in edges)
+                Edges.Add(edge);
+        }
+
+        public IEnumerable<HalfEdge2> GetEdgesAroundPoint(Vector2 point)
+        {
+            return Edges.Where(edge => edge.Vertex.Position.Equals(point));
+        }
+
+        public bool IsEdgeOnStack(HalfEdge2 edge, Stack<HalfEdge2> edgeStack)
+        {
+            return edgeStack.Contains(edge);
+        }
+
+        public void RemoveSuperTriangleVertices()
+        {
+            var superTriangleVertices = new HashSet<Vector2>
+            {
+                SuperTriangle.Point1,
+                SuperTriangle.Point2,
+                SuperTriangle.Point3
+            };
+
+            Faces.RemoveWhere(face => face.GetVertices().Any(v => superTriangleVertices.Contains(v.Position)));
+            Vertices.RemoveWhere(vertex => superTriangleVertices.Contains(vertex.Position));
+        }
+
+        private void AddVertexIfNotExists(HalfEdgeVertex2 vertex)
+        {
+            if (!Vertices.Contains(vertex))
+                Vertices.Add(vertex);
+        }
+    }
+
+    public static class GeometryUtils
+    {
+        private const float Epsilon = 0.00001f;
+
+        public static bool IsPointInsideTriangle(Vector2 a, Vector2 b, Vector2 c, Vector2 p)
+        {
+            float area = TriangleArea(a, b, c);
+            float area1 = TriangleArea(p, b, c);
+            float area2 = TriangleArea(a, p, c);
+            float area3 = TriangleArea(a, b, p);
+
+            return Mathf.Abs(area - (area1 + area2 + area3)) < Epsilon;
+        }
+
+        private static float TriangleArea(Vector2 a, Vector2 b, Vector2 c)
+        {
+            return Mathf.Abs((a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) / 2.0f);
+        }
+
+        public static bool ShouldFlipEdge(HalfEdge2 edge)
+        {
+            if (edge.OppositeEdge == null)
                 return false;
 
-            if (cos_a < 0f && cos_b < 0f)
-                return true;
+            Vector2 p1 = edge.Vertex.Position;
+            Vector2 p2 = edge.NextEdge.Vertex.Position;
+            Vector2 p3 = edge.PreviousEdge.Vertex.Position;
+            Vector2 pOpposite = edge.OppositeEdge.NextEdge.Vertex.Position;
 
-            float sin_ab = VectorCrossProduct(diff_13, diff_23) * cos_b + VectorCrossProduct(diff_2p, diff_1p) * cos_a;
-
-            return sin_ab < 0;
+            return IsPointInsideCircumcircle(p1, p2, p3, pOpposite);
         }
 
-        private static float VectorDotProduct(Vector2 a, Vector2 b)
+        public static bool IsPointToTheRightOrOnLine(Vector2 a, Vector2 b, Vector2 p)
         {
-            return a.x * b.x + a.y * b.y;
+            return GetPointInRelationToVectorValue(a, b, p) <= Epsilon;
         }
 
-        private static float VectorCrossProduct(Vector2 a, Vector2 b)
+        private static float GetPointInRelationToVectorValue(Vector2 a, Vector2 b, Vector2 p)
         {
-            return a.x * b.y - a.y * b.x;
+            float deltaX1 = a.x - p.x;
+            float deltaY1 = a.y - p.y;
+            float deltaX2 = b.x - p.x;
+            float deltaY2 = b.y - p.y;
+
+            return deltaX1 * deltaY2 - deltaX2 * deltaY1;
         }
 
-        private static void FlipTriangleEdge(HalfEdge2 edge)
+        private static bool IsPointInsideCircumcircle(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p)
         {
-            HalfEdge2 e1 = edge, e2 = edge.NextEdge, e3 = edge.PreviousEdge;
-            HalfEdge2 e4 = edge.OppositeEdge, e5 = e4.NextEdge, e6 = e4.PreviousEdge;
+            float[,] matrix = {
+            { p1.x - p.x, p1.y - p.y, (p1.x - p.x) * (p1.x - p.x) + (p1.y - p.y) * (p1.y - p.y) },
+            { p2.x - p.x, p2.y - p.y, (p2.x - p.x) * (p2.x - p.x) + (p2.y - p.y) * (p2.y - p.y) },
+            { p3.x - p.x, p3.y - p.y, (p3.x - p.x) * (p3.x - p.x) + (p3.y - p.y) * (p3.y - p.y) }
+        };
 
-            HalfEdgeVertex2 vA = e3.Vertex, vB = e2.Vertex, vC = e1.Vertex, vD = e5.Vertex;
+            return Determinant(matrix) > 0;
+        }
 
-            e1.Vertex = vB; e2.Vertex = vD; e3.Vertex = vC;
-            e4.Vertex = vA; e5.Vertex = vD; e6.Vertex = vC;
-
-            e1.NextEdge = e3; e1.PreviousEdge = e5;
-            e2.NextEdge = e4; e2.PreviousEdge = e6;
-            e3.NextEdge = e5; e3.PreviousEdge = e1;
-            e4.NextEdge = e6; e4.PreviousEdge = e2;
-            e5.NextEdge = e1; e5.PreviousEdge = e3;
-            e6.NextEdge = e2; e6.PreviousEdge = e4;
-
-            HalfEdgeFace2 f1 = e1.Face, f2 = e4.Face;
-
-            e1.Face = f1; e3.Face = f1; e5.Face = f1;
-            e2.Face = f2; e4.Face = f2; e6.Face = f2;
-
-            vB.Edge = e3; vC.Edge = e5; vD.Edge = e1;
-            vA.Edge = e4; vD.Edge = e6; vC.Edge = e2;
-
-            f1.Edge = e3; f2.Edge = e4;
+        private static float Determinant(float[,] matrix)
+        {
+            return matrix[0, 0] * (matrix[1, 1] * matrix[2, 2] - matrix[1, 2] * matrix[2, 1]) -
+                   matrix[0, 1] * (matrix[1, 0] * matrix[2, 2] - matrix[1, 2] * matrix[2, 0]) +
+                   matrix[0, 2] * (matrix[1, 0] * matrix[2, 1] - matrix[1, 1] * matrix[2, 0]);
         }
     }
 
@@ -438,7 +286,73 @@ namespace Retrover.Math
 
         public HalfEdge2(HalfEdgeVertex2 vertex)
         {
-            Vertex = vertex;
+            Vertex = vertex ?? throw new ArgumentNullException(nameof(vertex));
+        }
+
+        public List<HalfEdge2> Flip()
+        {
+            // Убедимся, что есть противоположное ребро для переворачивания
+            if (OppositeEdge == null)
+            {
+                throw new InvalidOperationException("Cannot flip an edge without an opposite edge.");
+            }
+
+            // Получаем соседние рёбра
+            HalfEdge2 a = this;
+            HalfEdge2 b = a.NextEdge;
+            HalfEdge2 c = b.NextEdge;
+            HalfEdge2 d = OppositeEdge;
+            HalfEdge2 e = d.NextEdge;
+            HalfEdge2 f = e.NextEdge;
+
+            // Получаем вершины
+            HalfEdgeVertex2 p1 = b.Vertex;
+            HalfEdgeVertex2 p2 = d.Vertex;
+            HalfEdgeVertex2 p3 = a.Vertex;
+            HalfEdgeVertex2 p4 = c.Vertex;
+
+            // Получаем грани
+            HalfEdgeFace2 face1 = a.Face;
+            HalfEdgeFace2 face2 = d.Face;
+
+            // Переориентируем рёбра
+            a.Vertex = p4;
+            b.Vertex = p2;
+            d.Vertex = p1;
+            e.Vertex = p3;
+
+            // Обновляем связи рёбер
+            a.NextEdge = e;
+            a.PreviousEdge = f;
+
+            d.NextEdge = b;
+            d.PreviousEdge = c;
+
+            b.NextEdge = c;
+            b.PreviousEdge = d;
+
+            e.NextEdge = f;
+            e.PreviousEdge = a;
+
+            c.NextEdge = d;
+            c.PreviousEdge = b;
+
+            f.NextEdge = a;
+            f.PreviousEdge = e;
+
+            // Обновляем грани
+            face1.Edge = a;
+            face2.Edge = d;
+
+            a.Face = face1;
+            b.Face = face2;
+            c.Face = face2;
+
+            d.Face = face1;
+            e.Face = face1;
+            f.Face = face2;
+
+            return new List<HalfEdge2> { this, NextEdge, PreviousEdge, OppositeEdge, OppositeEdge.NextEdge, OppositeEdge.PreviousEdge };
         }
     }
 
@@ -459,7 +373,65 @@ namespace Retrover.Math
 
         public HalfEdgeFace2(HalfEdge2 edge)
         {
-            Edge = edge;
+            Edge = edge ?? throw new ArgumentNullException(nameof(edge));
+        }
+
+        public IEnumerable<HalfEdgeVertex2> GetVertices()
+        {
+            yield return Edge.Vertex;
+            yield return Edge.NextEdge.Vertex;
+            yield return Edge.PreviousEdge.Vertex;
+        }
+
+        public IEnumerable<HalfEdge2> SplitFace(Vector2 splitPosition)
+        {
+            // Создание новой вершины в позиции разделения
+            HalfEdgeVertex2 newVertex = new(splitPosition);
+
+            // Получение исходных рёбер треугольника
+            HalfEdge2 originalEdge1 = Edge;
+            HalfEdge2 originalEdge2 = Edge.NextEdge;
+            HalfEdge2 originalEdge3 = Edge.PreviousEdge;
+
+            // Создание новых рёбер
+            HalfEdge2 newEdge1 = new(newVertex);
+            HalfEdge2 newEdge2 = new(newVertex);
+            HalfEdge2 newEdge3 = new(newVertex);
+
+            // Установка новых связей между рёбрами
+            newEdge1.NextEdge = originalEdge1.NextEdge;
+            newEdge1.PreviousEdge = newEdge2;
+
+            newEdge2.NextEdge = originalEdge2.NextEdge;
+            newEdge2.PreviousEdge = newEdge3;
+
+            newEdge3.NextEdge = originalEdge3.NextEdge;
+            newEdge3.PreviousEdge = newEdge1;
+
+            originalEdge1.NextEdge.PreviousEdge = newEdge1;
+            originalEdge2.NextEdge.PreviousEdge = newEdge2;
+            originalEdge3.NextEdge.PreviousEdge = newEdge3;
+
+            originalEdge1.NextEdge = newEdge1;
+            originalEdge2.NextEdge = newEdge2;
+            originalEdge3.NextEdge = newEdge3;
+
+            // Создание новых граней
+            HalfEdgeFace2 newFace1 = new(newEdge1);
+            HalfEdgeFace2 newFace2 = new(newEdge2);
+            HalfEdgeFace2 newFace3 = new(newEdge3);
+
+            // Установка связей между рёбрами и гранями
+            newEdge1.Face = newFace1;
+            newEdge2.Face = newFace2;
+            newEdge3.Face = newFace3;
+
+            originalEdge1.Face = newFace1;
+            originalEdge2.Face = newFace2;
+            originalEdge3.Face = newFace3;
+
+            // Возврат новых рёбер
+            return new List<HalfEdge2> { newEdge1, newEdge2, newEdge3 };
         }
     }
 }

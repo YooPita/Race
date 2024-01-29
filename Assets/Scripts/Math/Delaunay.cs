@@ -1,17 +1,17 @@
 ﻿using System;
+using System.Linq;
 
 namespace Retrover.Math
 {
     public class Delaunay
     {
-        public Triangulation Triangulation { get; private set; }
+        public TriangulationData TriangulationData { get; private set; }
 
         private readonly PointArea _pointArea;
 
         public Delaunay(PointArea pointArea)
         {
             _pointArea = pointArea;
-            Triangulation = new Triangulation(_pointArea.Points);
         }
 
         public void Calculate()
@@ -21,7 +21,9 @@ namespace Retrover.Math
                 throw new InvalidOperationException("Not enough points for calculation. Minimum 2 points required.");
             }
 
-            Triangulation.Calculate();
+            Triangulation triangulation = new(_pointArea.Normalize().ToHashSet());
+            triangulation.Calculate();
+            TriangulationData = triangulation.Data;
         }
 
         private bool CanCalculate()
