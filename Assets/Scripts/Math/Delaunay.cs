@@ -12,9 +12,9 @@ namespace Retrover.Math
         private readonly PointArea _pointArea;
         private TriangulationData _triangulationData;
 
-        public Delaunay(PointArea pointArea)
+        public Delaunay(Rect area, HashSet<Vector2> points)
         {
-            _pointArea = pointArea;
+            _pointArea = new PointArea(area, points);
         }
 
         public void Calculate()
