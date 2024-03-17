@@ -2,11 +2,11 @@ using Retrover.ObjectPool;
 using Retrover.Path;
 using System.Collections.Generic;
 
-public class RoadMeshes : MonoPool<RoadMesh>
+public class RoadMeshesPool : MonoPool<RoadMeshNew>
 {
-    public RoadMesh RoadMesh(List<PathTransform> pathTransforms, float roadWidth)
+    public RoadMeshNew RoadMesh(List<PathTransform> pathTransforms, float roadWidth)
     {
-        RoadMesh roadMesh = Pull();
+        RoadMeshNew roadMesh = Pull();
         roadMesh.Initialize(pathTransforms, roadWidth);
         return roadMesh;
     }

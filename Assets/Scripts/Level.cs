@@ -9,7 +9,7 @@ public class Level : MonoBehaviour
     private RoadClient _roadClient;
     [SerializeField] private GameObject _roadClientPrefab;
     [SerializeField] private PathBakeOptions _bakeOptions;
-    [SerializeField] private RoadMeshes _roadMeshes;
+    [SerializeField] private RoadMeshesPool _roadMeshes;
     [SerializeField] private Camera _camera;
 
     void Start()

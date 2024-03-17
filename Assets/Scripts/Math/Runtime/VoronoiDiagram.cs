@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace Retrover.Math
@@ -11,6 +12,12 @@ namespace Retrover.Math
 
         public VoronoiDiagram(IPointsGroup sites)
         {
+            _sites = sites;
+        }
+
+        public VoronoiDiagram(List<Vector2> points)
+        {
+            PointsGroup sites = new(points);
             _sites = sites;
         }
 
@@ -30,21 +37,36 @@ namespace Retrover.Math
 
         private void CalculateCells(VertexTriangleGroup triangles)
         {
-            foreach (KeyValuePair<Vector2, List<Triangle>> pointTrianglesPair in triangles)
+            List<(Vector2 point, List<Edge> edges)> tempCellData = new();
+
+            foreach (var pointTrianglesPair in triangles)
             {
                 Vector2 point = pointTrianglesPair.Key;
-                List<Vector2> centers = new();
-
-                foreach (Triangle triangle in pointTrianglesPair.Value)
-                    centers.Add(triangle.Circumcircle.Center);
+                List<Vector2> centers = pointTrianglesPair.Value.Select(triangle => triangle.Circumcircle.Center).ToList();
 
                 List<Vector2> centersWithoutDuplicates = RemoveDuplicateCenters(centers, 0.001f);
                 List<Vector2> sortedCenters = SortCentersByAngle(point, centersWithoutDuplicates);
 
-                VoronoiCell cell = CreateEdgesForCell(point, sortedCenters);
-
-                Cells.Add(cell);
+                List<Edge> edges = CalculateEdges(point, sortedCenters);
+                tempCellData.Add((point, edges));
             }
+
+            List<VoronoiCell> cells = tempCellData.Select(data => new VoronoiCell(data.point)).ToList();
+
+            foreach (var cell in cells)
+            {
+                var cellEdges = tempCellData.First(data => data.point == cell.Site).edges;
+                foreach (var edge in cellEdges)
+                {
+                    var neighbor = cells.FirstOrDefault(otherCell =>
+                        otherCell != cell && tempCellData.First(data => data.point == otherCell.Site).edges.Any(e => e.Equals(edge)));
+
+                    cell.AddEdge(edge, neighbor);
+                }
+            }
+
+            Cells.Clear();
+            Cells.AddRange(cells);
         }
 
         private static List<Vector2> SortCentersByAngle(Vector2 point, List<Vector2> centers)
@@ -59,16 +81,16 @@ namespace Retrover.Math
             return centers;
         }
 
-        private static VoronoiCell CreateEdgesForCell(Vector2 point, List<Vector2> sortedCenters)
+        private static List<Edge> CalculateEdges(Vector2 point, List<Vector2> sortedCenters)
         {
-            VoronoiCell cell = new(point);
+            List<Edge> edges = new();
             for (int i = 0; i < sortedCenters.Count; i++)
             {
                 Vector2 start = sortedCenters[i];
                 Vector2 end = sortedCenters[(i + 1) % sortedCenters.Count];
-                cell.Edges.Add(new Edge(start, end));
+                edges.Add(new Edge(start, end));
             }
-            return cell;
+            return edges;
         }
 
         private void RemoveCellsBelongingToSuperTriangle(Triangle superTriangle)

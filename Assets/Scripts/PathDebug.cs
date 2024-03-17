@@ -6,30 +6,41 @@ using UnityEngine.UIElements;
 
 public class PathDebug : MonoBehaviour
 {
-    private float _nextActionTime = 0.0f;
-    [SerializeField] private float _period = 0.1f;
-    private IPath _path;
-    private List<PathTransform> _transforms = new();
+    [SerializeField] private PathBakeOptions _bakeOptions;
     [SerializeField] private Transform _position1;
     [SerializeField] private Transform _position2;
     [SerializeField] private Transform _position3;
     [SerializeField] private Transform _handle1;
     [SerializeField] private Transform _handle2;
     [SerializeField] private Transform _handle3;
-    [SerializeField] private PathBakeOptions _options;
+    [SerializeField] private bool _drawGizmos = true;
+    private IPath _path;
+    private List<PathTransform> _transforms = new();
 
-    private void Update()
+    public IPath Path()
     {
-        if (Time.time > _nextActionTime)
-        {
-            _nextActionTime += _period;
-            CreatePath();
-        }
+        Regenerate();
+        return _path;
     }
+
+    [ContextMenu("Regenerate")]
+    private void Regenerate()
+    {
+        CreatePath();
+    }
+
+    //private void Update()
+    //{
+    //    if (Time.time > _nextActionTime)
+    //    {
+    //        _nextActionTime += _period;
+    //        CreatePath();
+    //    }
+    //}
 
     private void CreatePath()
     {
-        _path = new Path(_options);
+        _path = new Path(_bakeOptions);
         _path.AddNode(new SymmetricNode(_position1.position, _handle1.position));
         _path.AddNode(new SymmetricNode(_position2.position, _handle2.position));
         _path.AddNode(new SymmetricNode(_position3.position, _handle3.position));
@@ -41,6 +52,22 @@ public class PathDebug : MonoBehaviour
 
     public void OnDrawGizmos()
     {
+        if (!_drawGizmos)
+            return;
+
+        Gizmos.color = Color.red;
+        Gizmos.DrawSphere(_position1.position, 0.1f);
+        Gizmos.DrawSphere(_position2.position, 0.1f);
+        Gizmos.DrawSphere(_position3.position, 0.1f);
+
+        Gizmos.color = Color.blue;
+        Gizmos.DrawLine(_handle1.position, _position1.position);
+        Gizmos.DrawLine(_handle2.position, _position2.position);
+        Gizmos.DrawLine(_handle3.position, _position3.position);
+        Gizmos.DrawSphere(_handle1.position, 0.05f);
+        Gizmos.DrawSphere(_handle2.position, 0.05f);
+        Gizmos.DrawSphere(_handle3.position, 0.05f);
+
         if (_path == null)
             return;
 

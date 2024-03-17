@@ -4,20 +4,13 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class RoadMesh : MonoBehaviour, IPoolable
 {
+    [SerializeField] private MeshFilter _filter;
+    [SerializeField] private MeshRenderer _renderer;
     private Mesh _mesh;
     private float _roadWidth = 1.0f;
     private List<PathTransform> _pathTransforms = new();
-    private MeshFilter _filter;
-    private MeshRenderer _renderer;
-
-    void Awake()
-    {
-        _filter = GetComponent<MeshFilter>();
-        _renderer = GetComponent<MeshRenderer>();
-    }
 
     public void Initialize(List<PathTransform> pathTransforms, float width)
     {

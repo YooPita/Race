@@ -19,11 +19,11 @@ public class Road
     private int _nodesCount = 0;
     private IPath _path;
     private List<PathTransform> _transforms = new();
-    private RoadMeshes _roadMeshes;
-    private List<RoadMesh> _roadMeshesList = new();
+    private RoadMeshesPool _roadMeshes;
+    private List<RoadMeshNew> _roadMeshesList = new();
     private float _roadWidth = 15f;
 
-    public Road(Vector3 startPosition, PathBakeOptions bakeOptions, RoadMeshes roadMeshes)
+    public Road(Vector3 startPosition, PathBakeOptions bakeOptions, RoadMeshesPool roadMeshes)
     {
         _bakeOptions = bakeOptions;
         _path = new Path(_bakeOptions);
