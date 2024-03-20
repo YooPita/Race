@@ -1,11 +1,11 @@
-﻿using Retrover.Math;
+﻿using Reflex.Attributes;
+using Reflex.Core;
+using Retrover.Math;
 using Retrover.Path;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
 
 public class WorldMap
 {
@@ -90,14 +90,13 @@ public class WorldStream : IWorldFocusPoint, IWorldStreamPublisher
 
     private Vector2Int _currentChunk;
     private bool _initialized = false;
-    private readonly WorldMap _worldMap;
+    [Inject] private readonly WorldMap _worldMap;
     private int _size = 0;
     private VoronoiCell _currentCell;
     private Subscription<IWorldRenderer> _subscribers = new();
 
-    public WorldStream(WorldMap worldMap, int size = 1)
+    public WorldStream(int size = 1)
     {
-        _worldMap = worldMap;
         _size = Mathf.Abs(size);
     }
 
@@ -226,7 +225,7 @@ public interface IWorldStreamPublisher
     void Unsubscribe(IWorldRenderer subscriber);
 }
 
-public class RoadRenderer : IWorldRenderer, IStartable
+public class RoadRenderer : IWorldRenderer, IInitializable
 {
     [Inject] private readonly WorldStream _stream;
     [Inject] private readonly RoadChunkFactory _roadFactory;
@@ -238,7 +237,7 @@ public class RoadRenderer : IWorldRenderer, IStartable
         _worldSeed = seed;
     }
 
-    public void Start()
+    public void Initialize()
     {
         _stream.Subscribe(this);
     }
@@ -246,7 +245,7 @@ public class RoadRenderer : IWorldRenderer, IStartable
     public void Update()
     {
         if (_chunks.Count == 0)
-            Initialize(_stream.CurrentCell);
+            SetStartCell(_stream.CurrentCell);
         else if (_stream.CurrentCell.Site == _chunks[0].Cell.Site)
         {
             RemoveCellAtEnd();
@@ -259,7 +258,7 @@ public class RoadRenderer : IWorldRenderer, IStartable
         }
     }
 
-    private void Initialize(VoronoiCell cell)
+    private void SetStartCell(VoronoiCell cell)
     {
         CellToChunk currentChunk = new(cell, RenderChunk(cell));
         currentChunk.View.Render();
@@ -360,11 +359,11 @@ public class RoadRenderer : IWorldRenderer, IStartable
 
 public class RoadChunkFactory
 {
-    [Inject] private readonly IObjectResolver _resolver;
+    [Inject] private readonly Container _container;
 
     public RoadChunkView NewRoadChunkView(VoronoiCell cell, Edge startEdge, Edge endEdge)
     {
-        RoadChunkView roadChunkView = _resolver.Resolve<RoadChunkView>();
+        RoadChunkView roadChunkView = _container.Resolve<RoadChunkView>();
         roadChunkView.Initialize(cell, startEdge, endEdge);
         return roadChunkView;
     }

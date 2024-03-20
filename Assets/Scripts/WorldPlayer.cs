@@ -1,5 +1,5 @@
+using Reflex.Attributes;
 using UnityEngine;
-using VContainer;
 
 public class WorldPlayer : MonoBehaviour
 {

@@ -14,6 +14,13 @@
       "dependencies": {},
       "hash": "75f68222d0a4bd2b468dbf3e6a17a191d28041ab"
     },
+    "com.gustavopsantos.reflex": {
+      "version": "https://github.com/gustavopsantos/reflex.git?path=/Assets/Reflex/#7.1.0",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "98633907dd9a0a22892269edeb7e8e8a4e57ba95"
+    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 0,
@@ -70,13 +77,6 @@
     },
     "com.unity.mathematics": {
       "version": "1.2.6",
-      "depth": 1,
-      "source": "registry",
-      "dependencies": {},
-      "url": "https://packages.unity.com"
-    },
-    "com.unity.nuget.mono-cecil": {
-      "version": "1.11.4",
       "depth": 1,
       "source": "registry",
       "dependencies": {},
@@ -170,15 +170,6 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       },
       "url": "https://packages.unity.com"
-    },
-    "jp.hadashikick.vcontainer": {
-      "version": "https://github.com/hadashiA/VContainer.git?path=VContainer/Assets/VContainer#1.13.2",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {
-        "com.unity.nuget.mono-cecil": "1.10.1"
-      },
-      "hash": "af7bd4ecabaf6ea3f9e58ecc4352dd5296e5ef29"
     },
     "com.unity.modules.ai": {
       "version": "1.0.0",

@@ -451,6 +451,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 802781075}
+  - component: {fileID: 802781077}
   - component: {fileID: 802781076}
   m_Layer: 0
   m_Name: LifetimeScope
@@ -483,16 +484,25 @@ MonoBehaviour:
   m_GameObject: {fileID: 802781073}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 86fc073caecf81042b2e9ddb4325ed63, type: 3}
+  m_Script: {fileID: 11500000, guid: 79346eda6bc748e43bc820aac0cb5d58, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  parentReference:
-    TypeName: 
-  autoRun: 1
-  autoInjectGameObjects:
+  _roadMeshesPool: {fileID: 1912439623}
+  _gameObjectsToInject:
   - {fileID: 333720485}
   - {fileID: 1009271876}
-  - {fileID: 1912439622}
+--- !u!114 &802781077
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 802781073}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fd1482e4a9dee141aecc5bcd0a4f0f3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1009271876
 GameObject:
   m_ObjectHideFlags: 0
